@@ -1,0 +1,23 @@
+﻿<!DOCTYPE html>
+    <html lang="en">
+        <head>
+        <meta charset="UTF-8">
+            <meta name="viewport" content = "width=device-width, initial-scale=1.0">
+                <meta http - equiv="X-UA-Compatible" content = "ie=edge">
+                    <title>Varda Gaming API - Your API token </title>
+         <link rel = "stylesheet" href = "style.css">
+         </head>
+         <body>
+         <h1>Your API token is:</h1>
+         <p style='border: 1px solid black; padding:5px;'><%= locals.token %></p>
+         <div style="height:20px"></div>
+         <h3>API request example:</h3>
+         <p style='border: 1px solid grey; padding:5px; color:darkgrey;'>
+            POST /new HTTP/1.1<br />
+            Host: api.varda.vision<br />
+            Accept: application/json<br />
+            Content-Type: application/json<br />
+            Authorization: Bearer {<%= locals.token %>}
+            </p>
+         </body>
+    </html>

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Varda Gaming API</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <form action="/token/<%= locals.tokenId %>" method="POST">
+      <Label><p>TokenID</p>
+        <input type="text" name="tokenId" placeholder="<%= locals.tokenId %>"/>
+      </Label>
+      <Label><p>CID</p>
+        <input type="text" name="CID" placeholder="CID"/>
+      </Label>
+      <Label><p>Link</p>
+        <input type="text" name="tokenId" placeholder="https://example.io"/>
+      </Label>
+      <button type="submit">Submit</button>
+    </form>
+  </body>
+</html>
