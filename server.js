@@ -1,4 +1,4 @@
-﻿require('dotenv').config()
+require('dotenv').config()
 const express = require('express')
 const app = express()
 const jwt = require('jsonwebtoken')
@@ -107,26 +107,29 @@ function fetchByContract(req, res, next) {
     res.result = object;
       const contracts = object.list;
       nfts = [];
+      var requestOptions = {
+          method: 'GET',
+          redirect: 'follow'
+      };
       for (var i = 0, l = contracts.length; i < l; i++) {
           var batch = contracts[i];
           const nearUtils = async () => {
-              fetch(`https://rpc.web4.near.page/account/${batch}/view/nft_tokens_for_owner?account_id=${req.params.name}`)
+              fetch(`https://rpc.web4.near.page/account/${batch}/view/nft_tokens_for_owner?account_id=${req.params.name}`, requestOptions)
                   .then(res => {
-                      error = res.includes("method nft_tokens_for_owner not found");
-                      if (error = true) {
-                          return {}
+                      error = res
+                          .toString()
+                          .includes("method nft_tokens_for_owner not found");
+                      if (error === true) {
+                          return {};
                       } else {
-                          nft = JSON.parse(res);
+                          nft = res.toString();
                           console.log(nft);
-                          nfts.push(nft);
-                          return nft;
                       }
-                      // return res.json()
                   })
           }
           var nfts = nearUtils();
           if (nfts !== undefined) {
-              console.log(nfts);
+             // console.log(nfts);
           } else {
               console.log("cannot find anything")
           }
