@@ -4,7 +4,6 @@ const app = express()
 const jwt = require('jsonwebtoken')
 const bcrypt = require('bcrypt')
 const fetch = require('cross-fetch')
-const near = require('near-api-js')
 const logger = require('./utils/logger')
 const fs = require('fs')
 const path = require('path')
@@ -93,37 +92,46 @@ app.get('/owner/:name', fetchByContract, (req, res) => {
 })
 
 
-function fetchByContract(req, res, next) {
-    // urls to check json responses: 
-    // https://rpc.web4.near.page/account/mailgun.near/view/nft_tokens_for_owner?account_id=jilt.near
-    // https://rpc.web4.near.page/account/mint-varda.near/view/nft_tokens_for_owner?account_id=jilt.near
-    var rawNfts = [];
-    fetch(`https://api.kitwallet.app/account/${req.params.name}/likelyNFTsFromBlock`)
-        .then(res => {
-            if (res.status >= 400) return res.status(400);
-            return res.json()
-        }).then(object => {
-            res.result = object;
-            const contracts = object.list;
-            for (var i = 0, l = contracts.length; i < l; i++) {
-                var batch = contracts[i];
-                var regExp = /\[([^)]+)\]/;
-                const nearUtils = async () => {
-                    fetch(`https://rpc.web4.near.page/account/${batch}/view/nft_tokens_for_owner?account_id=${req.params.name}`)
-                        .then(response => response.text())
-                        .then(result => { rawNft = result.toString(); cleaNft = regExp.exec(rawNft); if (cleaNft !== null) { cleaned = cleaNft[0]; console.log(cleaned); rawNfts.push(cleaned); } })
-                        .catch(error => console.log('error', error));
-                         // return res.json()
+async function fetchByContract(req, res, next) {
+
+    const rawNfts = [];
+    let response = await fetch(
+        `https://api.kitwallet.app/account/${req.params.name}/likelyNFTsFromBlock`
+    );
+    if (response.status >= 400) {
+        return res.status(400).send();
+    }
+    const data = await response.json();
+    const contracts = data.list;
+
+    for (let i = 0; i < contracts.length; i++) {
+        let batch = contracts[i];
+        let regExp = /\[([^)]+)\]/;
+        const nearUtils = async () => {
+            try {
+                let response = await fetch(
+                    `https://rpc.web4.near.page/account/${batch}/view/nft_tokens_for_owner?account_id=${req.params.name}`
+                );
+                const data = await response.text();
+                const rawNft = data.toString();
+                let cleaNft = regExp.exec(rawNft);
+                if (cleaNft !== null) {
+                    cleaned = cleaNft[0];
+                    cleanObj = JSON.parse(cleaned);
+                    rawNfts.push(cleanObj);
+                    return cleanObj;
                 }
-                var allNfts = nearUtils();
-                if (allNfts !== undefined) {
-                } else {
-                    console.log("cannot find anything")
-                }
+            } catch (error) {
+                console.log('error', error);
             }
-            console.log(rawNfts)
-            })
+        };
+        let allNfts = await nearUtils();
+    }
+    resNfts = JSON.stringify(rawNfts);
+    res.json(resNfts);
+    console.log(rawNfts);
 }
+
 
 function verifyUser(req, res, next) {
     const userData = fs.readFileSync(path.join(__dirname, 'users.json'), 'utf8');
@@ -141,26 +149,25 @@ function verifyUser(req, res, next) {
     next()
 }
 
-//app
-//  .route('/token/:tokenId')
-//  .get((req, res)=>{
-//    res.send(`Owners of NFT ${req.param.tokenId}`) 
-//  })
-//.put((req, res)=>{
-//    res.send(`Update unlockable of NFT ${req.param.tokenId}`)
-//  })
-//.delete((req, res)=>{
-//    res.send(`Delete unlockable of NFT ${req.param.tokenId}`)
-//  })
-//.post((req, res)=>{
-//    res.send(`Set unlockable of NFT ${req.body.tokenId}`)
-// get tokenid from query string
-//    console.log(req.query.tokenId)
-//  })
+app
+    .route('/token/:tokenId')
+  .get((req, res)=>{
+    res.send(`Owners of NFT ${req.param.tokenId}`) 
+  })
+.put((req, res)=>{
+    res.send(`Update unlockable of NFT ${req.param.tokenId}`)
+  })
+.delete((req, res)=>{
+    res.send(`Delete unlockable of NFT ${req.param.tokenId}`)
+  })
+.post((req, res)=>{
+    res.send(`Set unlockable of NFT ${req.body.tokenId}`)
+    console.log(req.query.tokenId)
+  })
 
-//app.param('tokenId', (req, res, next, tokenId) => {
-//  req.token = NFTs[tokenId]
-//  next()
-//})
+app.param('tokenId', (req, res, next, tokenId) => {
+  req.token = NFTs[tokenId]
+  next()
+})
 
 app.listen(3333)
