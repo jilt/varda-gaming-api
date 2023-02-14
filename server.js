@@ -118,7 +118,29 @@ async function fetchByContract(req, res, next) {
                 if (cleaNft !== null) {
                     cleaned = cleaNft[0];
                     cleanObj = JSON.parse(cleaned);
-                    rawNfts.push(cleanObj);
+                    if (cleanObj[0].metadata.title == null) {
+                        var preres = await fetch("https://interop-mainnet.hasura.app/v1/graphql", {
+                            method: "POST",
+                            headers: { "content-type": "application/json" },
+                            body: JSON.stringify({
+                                query:
+                                    '{ nft_tokens(where: {reference: {_eq: "' + cleanObj[0].metadata.reference + '"}}) { metadata_id }}'
+                            }),
+                        })
+                        const owndata = await preres.json();
+                        const owndatastr = JSON.stringify(owndata);
+                        const ownraw = JSON.parse(owndatastr);
+                        const owned = ownraw.data.nft_tokens;
+                        // write only if you find metadata
+                        if (typeof owned[0] === "undefined") { } else {
+                            var token_id = owned[0].metadata_id;
+                            var token = {
+                                token_id: token_id
+                            }
+                            rawNfts.push(token);
+                        }
+                    }
+                    rawNfts.push(cleanObj)
                     return cleanObj;
                 }
             } catch (error) {
@@ -127,9 +149,8 @@ async function fetchByContract(req, res, next) {
         };
         let allNfts = await nearUtils();
     }
-    resNfts = JSON.stringify(rawNfts);
-    res.json(resNfts);
-    console.log(rawNfts);
+    //resNfts = JSON.stringify(rawNfts);
+    res.json(rawNfts);
 }
 
 
