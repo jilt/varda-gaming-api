@@ -5,26 +5,21 @@ const jwt = require('jsonwebtoken')
 const bcrypt = require('bcrypt')
 const fetch = require('cross-fetch')
 const logger = require('./utils/logger')
+const db = require('./utils/db')
 const fs = require('fs')
 const path = require('path')
-const crypto = require('crypto');
 
 
 app.use(express.json());
 
-app.use(express.static('public'))
+
 app.use(express.urlencoded({ extended: true }))
 //use json
 app.set('view engine', 'ejs')
+app.use(express.static(__dirname + '/views'));
 
-app.get('/', (req, res) => {
-    console.log('server running')
-    res.render('index', { text: 'world' })
-})
-
-
-app.get('/token', (req, res) => {
-    res.send(crypto.randomBytes(32).toString('hex'));
+app.get('/token/:tokenId', (req, res) => {
+    console.log(req.locked)
 })
 app.get('/register', (req, res) => {
     res.render('register')
@@ -43,7 +38,7 @@ app.post('/register', async (req, res) => {
         // create jwt accessToken to access safe endpoint
         const user = req.body.name
         // JWT Must be valid to work on the /new route. I made the validity of a jwt 30 days. you can change it.
-        const accessToken = jwt.sign({ name: user }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '30d' })
+        const accessToken = jwt.sign({ name: user }, process.env.ACCESS_TOKEN_SECRET)
         const hashedPassword = bcrypt.hashSync(req.body.password, 10)
 
         const userObject = {
@@ -66,10 +61,42 @@ app.post('/register', async (req, res) => {
 
 // token restricted endpoint
 app.get('/new', authenticateToken, (req, res) => {
-    console.log('add unlockable')
-    console.log(req.user) //The name of user
     res.render('new')
 })
+
+// unlockables endpoints
+
+app.post('/new/:tokenId/:CID/:link', authenticateToken, (req, res) => {
+    res.send(`Set unlockable of NFT ${req.params.tokenId}`);
+    var newLocked = {
+        id: req.params.tokenId,
+        CID: req.params.CID,
+        link: `https://${req.params.link}`
+    };
+    // Update the db.json file (created automatically if it does not exist)
+    db(newLocked, 'db.json');
+})
+
+
+app.put('/new/:tokenId/:CID/:link', authenticateToken, (req, res) => {
+    res.send(`Update unlockable of NFT ${req.param.tokenId}`)
+    var newLocked = {
+        id: req.params.tokenId,
+        CID: req.params.CID,
+        link: req.params.link
+    };
+
+    send.json(newLocked);
+})
+
+app.delete('/new/:tokenId', authenticateToken, (req, res) => {
+    res.send(`Delete unlockable of NFT ${req.param.tokenId}`);
+})
+app.param('tokenId', (req, res, next, tokenId) => {
+    //req.locked = lockedb[tokenId];
+    next();
+}
+)
 
 //middleware to autenticate JWT token
 
@@ -86,11 +113,19 @@ function authenticateToken(req, res, next) {
     })
 }
 
+const mintbasedb = require("./db.json");
+app.get('/mintbasevault', (req, res) => {
+    res.json(mintbasedb);
+})
 
 app.get('/owner/:name', fetchByContract, (req, res) => {
     res.send(`NFT Owned by ${req.params.name}`)
 })
 
+app.get('/', (req, res) => {
+    console.log('server running')
+    res.render('index', { text: 'world' })
+})
 
 async function fetchByContract(req, res, next) {
 
@@ -107,6 +142,8 @@ async function fetchByContract(req, res, next) {
     for (let i = 0; i < contracts.length; i++) {
         let batch = contracts[i];
         let regExp = /\[([^)]+)\]/;
+        let mintegExp = new RegExp(/mintbase/);
+        matching = mintegExp.test(batch);
         const nearUtils = async () => {
             try {
                 let response = await fetch(
@@ -118,13 +155,13 @@ async function fetchByContract(req, res, next) {
                 if (cleaNft !== null) {
                     cleaned = cleaNft[0];
                     cleanObj = JSON.parse(cleaned);
-                    if (cleanObj[0].metadata.title == null) {
+                    if (matching === true) {
                         var preres = await fetch("https://interop-mainnet.hasura.app/v1/graphql", {
                             method: "POST",
                             headers: { "content-type": "application/json" },
                             body: JSON.stringify({
                                 query:
-                                    '{ nft_tokens(where: {reference: {_eq: "' + cleanObj[0].metadata.reference + '"}}) { metadata_id }}'
+                                    '{ nft_tokens(where: {nft_contract_id: {_eq: "jiltverse.mintbase1.near"}, token_id: {_eq: "' + cleanObj[0].token_id + '"}}) { metadata_id }}'
                             }),
                         })
                         const owndata = await preres.json();
@@ -134,14 +171,15 @@ async function fetchByContract(req, res, next) {
                         // write only if you find metadata
                         if (typeof owned[0] === "undefined") { } else {
                             var token_id = owned[0].metadata_id;
-                            var token = {
-                                token_id: token_id
-                            }
+                            var token = [
+                                { token_id: token_id }
+                            ]
                             rawNfts.push(token);
                         }
+                    } else {
+                        rawNfts.push(cleanObj)
+                        return cleanObj;
                     }
-                    rawNfts.push(cleanObj)
-                    return cleanObj;
                 }
             } catch (error) {
                 console.log('error', error);
@@ -152,7 +190,6 @@ async function fetchByContract(req, res, next) {
     //resNfts = JSON.stringify(rawNfts);
     res.json(rawNfts);
 }
-
 
 function verifyUser(req, res, next) {
     const userData = fs.readFileSync(path.join(__dirname, 'users.json'), 'utf8');
@@ -170,25 +207,4 @@ function verifyUser(req, res, next) {
     next()
 }
 
-app
-    .route('/token/:tokenId')
-  .get((req, res)=>{
-    res.send(`Owners of NFT ${req.param.tokenId}`) 
-  })
-.put((req, res)=>{
-    res.send(`Update unlockable of NFT ${req.param.tokenId}`)
-  })
-.delete((req, res)=>{
-    res.send(`Delete unlockable of NFT ${req.param.tokenId}`)
-  })
-.post((req, res)=>{
-    res.send(`Set unlockable of NFT ${req.body.tokenId}`)
-    console.log(req.query.tokenId)
-  })
-
-app.param('tokenId', (req, res, next, tokenId) => {
-  req.token = NFTs[tokenId]
-  next()
-})
-
-app.listen(3333)
+app.listen(8080)
